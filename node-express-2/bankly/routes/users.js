@@ -4,7 +4,7 @@ const User = require('../models/user');
 const express = require('express');
 const router = new express.Router();
 const ExpressError = require('../helpers/expressError');
-const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
+const { ensureAdmin, authenticateJWT, ensureLoggedIn } = require('../middleware/auth');
 
 /** GET /
  *
@@ -15,7 +15,7 @@ const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
  *
  */
 
-router.get('/', authUser, requireLogin, async function(req, res, next) {
+router.get('/', authenticateJWT, ensureLoggedIn, async function(req, res, next) {
   try {
     let users = await User.getAll();
     return res.json({ users });
@@ -35,7 +35,7 @@ router.get('/', authUser, requireLogin, async function(req, res, next) {
  *
  */
 
-router.get('/:username', authUser, requireLogin, async function(
+router.get('/:username', authenticateJWT,ensureLoggedIn, async function(
   req,
   res,
   next
@@ -63,13 +63,13 @@ router.get('/:username', authUser, requireLogin, async function(
  *
  */
 
-router.patch('/:username', authUser, requireLogin, requireAdmin, async function(
+router.patch('/:username', authenticateJWT, ensureLoggedIn, ensureAdmin, async function(
   req,
   res,
   next
 ) {
   try {
-    if (!req.curr_admin && req.curr_username !== req.params.username) {
+    if (!res.locals.admin && res.locals.username!== req.params.username) {
       throw new ExpressError('Only  that user or admin can edit a user.', 401);
     }
 
@@ -94,11 +94,7 @@ router.patch('/:username', authUser, requireLogin, requireAdmin, async function(
  * If user cannot be found, return a 404 err.
  */
 
-router.delete('/:username', authUser, requireAdmin, async function(
-  req,
-  res,
-  next
-) {
+router.delete('/:username', authenticateJWT, ensureAdmin, async function(req,res,next) {
   try {
     User.delete(req.params.username);
     return res.json({ message: 'deleted' });

@@ -1,8 +1,13 @@
 const bcrypt = require('bcrypt');
 const db = require('../db');
-const ExpressError = require('../helpers/expressError');
+
 const sqlForPartialUpdate = require('../helpers/partialUpdate');
 const { BCRYPT_WORK_FACTOR } = require("../config");
+const {
+  NotFoundError,
+  BadRequestError,
+  UnauthorizedError,
+} = require("../helpers/expressError");
 
 class User {
 
@@ -51,6 +56,7 @@ class User {
    * */
 
   static async authenticate(username, password) {
+    
     const result = await db.query(
       `SELECT username,
                 password,
@@ -65,13 +71,20 @@ class User {
     );
 
     const user = result.rows[0];
-
-    if (user && (await bcrypt.compare(password, user.password))) {
-      return user;
-    } else {
-      throw new ExpressError('Cannot authenticate', 401);
+    if (user) {
+      const isValid = await bcrypt.compare(password, user.password);
+      if (isValid === true) {
+        delete user.password;
+        return user
+      }
+    } 
+    console.error('Authentication failed. User:', username);
+    console.error('Input password:', password);
+    console.error('Stored hashed password:', user ? user.password : 'User not found')
+    throw new UnauthorizedError("Invalid username/password")
+  
     }
-  }
+  
 
   /** Returns list of user info:
    *
@@ -113,7 +126,7 @@ class User {
     const user = result.rows[0];
 
     if (!user) {
-      new ExpressError('No such user', 404);
+      throw NotFoundError('No such user', 404);
     }
 
     return user;
@@ -159,7 +172,7 @@ class User {
     const user = result.rows[0];
 
     if (!user) {
-      throw new ExpressError('No such user', 404);
+      throw new BadRequestError('No such user', 404);
     }
 
     return true;
